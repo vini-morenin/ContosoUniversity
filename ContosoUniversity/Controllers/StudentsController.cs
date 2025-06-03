@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using ContosoUniversity.Data;
 using ContosoUniversity.Models;
+using ContosoUniversity.Data;
 
 namespace ContosoUniversity.Controllers
 {
@@ -20,10 +20,64 @@ namespace ContosoUniversity.Controllers
         }
 
         // GET: Students
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            string sortOrder,
+            string currentFilter,
+            string searchString,
+            int? pageNumber)
         {
-            return View(await _context.Students.ToListAsync());
+            ViewData["CurrentSort"] = sortOrder;
+            ViewData["NameSortParm"] =
+                String.IsNullOrEmpty(sortOrder) ? "LastName_desc" : "";
+            ViewData["DateSortParm"] =
+                sortOrder == "EnrollmentDate" ? "EnrollmentDate_desc" : "EnrollmentDate";
+
+            if (searchString != null)
+            {
+                pageNumber = 1;
+            }
+            else
+            {
+                searchString = currentFilter;
+            }
+
+            ViewData["CurrentFilter"] = searchString;
+
+            var students = from s in _context.Students
+                           select s;
+
+            if (!String.IsNullOrEmpty(searchString))
+            {
+                students = students.Where(s => s.LastName.Contains(searchString)
+                                         || s.FirstName.Contains(searchString));
+            }
+
+            if (string.IsNullOrEmpty(sortOrder))
+            {
+                sortOrder = "LastName";
+            }
+
+            bool descending = false;
+            if (sortOrder.EndsWith("_desc"))
+            {
+                sortOrder = sortOrder.Substring(0, sortOrder.Length - 5);
+                descending = true;
+            }
+
+            if (descending)
+            {
+                students = students.OrderByDescending(e => EF.Property<object>(e, sortOrder));
+            }
+            else
+            {
+                students = students.OrderBy(e => EF.Property<object>(e, sortOrder));
+            }
+
+            int pageSize = 3;
+            return View(await PaginatedList<Student>.CreateAsync(students.AsNoTracking(),
+                pageNumber ?? 1, pageSize));
         }
+
 
         // GET: Students/Details/5
         public async Task<IActionResult> Details(int? id)
@@ -38,6 +92,7 @@ namespace ContosoUniversity.Controllers
                     .ThenInclude(e => e.Course)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ID == id);
+
             if (student == null)
             {
                 return NotFound();
@@ -57,8 +112,8 @@ namespace ContosoUniversity.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(
-    [Bind("EnrollmentDate,FirstMidName,LastName")] Student student)
+        // ALTERADO: "FirstMidName" para "FirstName" no Bind
+        public async Task<IActionResult> Create([Bind("EnrollmentDate,FirstName,LastName")] Student student)
         {
             try
             {
@@ -76,6 +131,7 @@ namespace ContosoUniversity.Controllers
                     "Try again, and if the problem persists " +
                     "see your system administrator.");
             }
+
             return View(student);
         }
         // GET: Students/Edit/5
@@ -106,15 +162,15 @@ namespace ContosoUniversity.Controllers
                 return NotFound();
             }
             var studentToUpdate = await _context.Students.FirstOrDefaultAsync(s => s.ID == id);
+            // ALTERADO: s => s.FirstMidName para s => s.FirstName
             if (await TryUpdateModelAsync<Student>(
                 studentToUpdate,
                 "",
-                s => s.FirstMidName, s => s.LastName, s => s.EnrollmentDate))
+                s => s.FirstName, s => s.LastName, s => s.EnrollmentDate))
             {
                 try
                 {
                     await _context.SaveChangesAsync();
-                    return RedirectToAction(nameof(Index));
                 }
                 catch (DbUpdateException /* ex */)
                 {
@@ -123,6 +179,7 @@ namespace ContosoUniversity.Controllers
                         "Try again, and if the problem persists, " +
                         "see your system administrator.");
                 }
+                return RedirectToAction(nameof(Index));
             }
             return View(studentToUpdate);
         }

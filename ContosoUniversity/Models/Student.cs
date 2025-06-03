@@ -1,16 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 
 namespace ContosoUniversity.Models
 {
-    public class Student
-    //A propriedade Enrollments é uma propriedade de navegação. As propriedades de navegação armazenam outras entidades que estão relacionadas a essa entidade. A propriedade Enrollments de uma entidade Student:
+    public class Student : Person // Student herda de Person
     {
-        public int ID { get; set; }
-        public string LastName { get; set; }
-        public string FirstMidName { get; set; }
+       
+        [DataType(DataType.Date)]
+        [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true)]
+        [Display(Name = "Enrollment Date")]
         public DateTime EnrollmentDate { get; set; }
 
         public ICollection<Enrollment> Enrollments { get; set; }
+
+        
+        // //[RegularExpression(@"^[A-Z]+[a-zA-Z]*$")]    -ADICIONAR DEPOIS
     }
 }

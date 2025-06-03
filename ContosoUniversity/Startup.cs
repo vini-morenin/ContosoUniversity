@@ -1,7 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+using ContosoUniversity.Data;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -9,9 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore;
-using ContosoUniversity.Data;
-
 
 namespace ContosoUniversity
 {
@@ -33,8 +33,6 @@ namespace ContosoUniversity
             services.AddDatabaseDeveloperPageExceptionFilter();
 
             services.AddControllersWithViews();
-
-
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -52,6 +50,22 @@ namespace ContosoUniversity
             }
             app.UseHttpsRedirection();
             app.UseStaticFiles();
+
+            app.Use(async (context, next) =>
+            {
+                Console.WriteLine($"Requisição Recebida: {context.Request.Method} {context.Request.Path}");
+                // Se for uma requisição POST, tente ler o corpo (cuidado com grandes uploads)
+                if (context.Request.Method == "POST" && context.Request.HasFormContentType)
+                {
+                    context.Request.EnableBuffering();
+                    var reader = new System.IO.StreamReader(context.Request.Body);
+                    var body = await reader.ReadToEndAsync();
+                    Console.WriteLine($"Corpo da Requisição POST: {body}");
+                    context.Request.Body.Position = 0; // Resetar a posição para que os próximos middlewares possam ler
+                }
+                await next();
+                Console.WriteLine($"Requisição Finalizada: {context.Response.StatusCode}");
+            });
 
             app.UseRouting();
 
